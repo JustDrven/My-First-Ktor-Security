@@ -1,8 +1,11 @@
 package dev.justdrven
 
 import dev.justdrven.managers.HashManager
+import dev.justdrven.managers.LoginRequest
 import io.ktor.http.*
+import io.ktor.serialization.jackson.*
 import io.ktor.server.application.*
+import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -21,11 +24,15 @@ fun main(args: Array<String>) {
 }
 
 fun Application.module() {
+    install(ContentNegotiation) {
+        jackson()
+    }
     routing {
         get("/") {
             call.respond(HttpStatusCode.OK, "Routing \n" +
                     " - /auth | Testing auth \n" +
-                    " - /auth/api_key | Testing auth with api key")
+                    " - /auth/api_key | Testing auth with api key \n" +
+                    " - /auth/body | Testing body credentials")
         }
         get("/auth") {
             checkIfRequestAuthorization(call)
@@ -35,6 +42,12 @@ fun Application.module() {
         get("/auth/api_key") {
             checkIfRequestAuthorization(call)
             checkIfRequestHasApiKey(call)
+
+            success(call)
+        }
+
+        post("/auth/body") {
+            checkIfRequestBodyHasCredentials(call)
 
             success(call)
         }
@@ -56,6 +69,13 @@ suspend fun checkIfRequestHasApiKey(call: ApplicationCall) {
     val value = (auth != "null" && auth == System.getProperty("api_key"))
     if (!value)
         call.respond(HttpStatusCode.NotFound, "Missing API Key")
+}
+
+suspend fun checkIfRequestBodyHasCredentials(call: ApplicationCall) {
+    val credentials: LoginRequest = call.receive<LoginRequest>()
+    val value =  (credentials.username == "testUsername" && credentials.password == "testPassword")
+    if (!value)
+        call.respond(HttpStatusCode.Unauthorized, "Unauthorized!")
 }
 
 suspend fun success(call: ApplicationCall) = call.respond(HttpStatusCode.OK, "Wow, you really got in here.")
